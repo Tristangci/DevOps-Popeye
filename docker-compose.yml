@@ -1,0 +1,82 @@
+version: "3"
+
+services:
+  poll:
+    build:
+      context: ./poll
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    restart: unless-stopped
+    ports:
+      - "5000:80"
+    environment:
+      REDIS_HOST: redis
+    depends_on:
+      - redis
+    networks:
+      - poll-tier
+
+  redis:
+    image: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - poll-tier
+      - back-tier
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      DB_HOST: db
+    depends_on:
+      - redis
+      - db
+    networks:
+      - back-tier
+
+  db:
+    image: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: database
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - result-tier
+      - back-tier
+
+  result:
+    build:
+      context: ./result
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    restart: unless-stopped
+    ports:
+      - "5001:80"
+    environment:
+      DB_HOST: db
+    depends_on:
+      - db
+    networks:
+      - result-tier
+
+networks:
+  poll-tier:
+  result-tier:
+  back-tier:
+
+volumes:
+  db-data:
